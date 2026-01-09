@@ -20,7 +20,7 @@ import numpy as np
 import astropy
 import astropy.time
 import astropy.units as u
-from astropy.coordinates import EarthLocation, SkyCoord
+from astropy.coordinates import EarthLocation, SkyCoord, Angle
 from pytz import timezone
 from astroplan import Observer, FixedTarget
 
@@ -93,25 +93,23 @@ class AstroPlanWrapper():
         logger.info(f"{'Sunrise':<16}: {format_with_tz(sunrise, tzchile)} = {format_with_tz(sunrise, tzbonn)} = {format_with_tz(sunrise, tzvancouver)}")
 
 
-    def prepare_program(self, targetname, targetra=None, targetdec=None, filter='R', exptime=60, nexp=5, dither=True, outputfile=None):
+    def prepare_program(self, targetname, ra=None, dec=None, filter='R', exptime=60, nexp=5, stare=False, outputfile=None):
         """
         Prepares a "program" file with dithered exposures of the given target.
         
         :param targetname: name of the target
-        :param targetra: optional RA of target in '20h41m25.9s'
-        :param targetdec: optional Dec of target in '+45d16m49.3s'
+        :param ra: optional RA of target
+        :param dec: optional Dec of target
 
         Reference output format:
         target: IC1613, ra: 01 04 48.00, dec: 02 07 04.0, filter: R, exposure time: 60, exposure type: light, rotator: absolute, image prefix: IC1613_R, focuser: 21200, nexposure: 1
 
-
-
         """
+        dither = not stare
+        dither_radius = 15 * u.arcsec
 
-        dither_radius = 30 * u.arcsec
-
-        if targetra is not None and targetdec is not None:
-            coordinates = SkyCoord(targetra, targetdec, frame='icrs')
+        if ra is not None and dec is not None:
+            coordinates = SkyCoord(Angle(ra), Angle(dec), frame='icrs')
             target = FixedTarget(name=targetname, coord=coordinates)
         else: # We use Simbad to resolve the name
             target = FixedTarget.from_name(targetname)
@@ -146,13 +144,6 @@ class AstroPlanWrapper():
 
 
 
-
-        # Placeholder implementation
-        #logger.info(f"Preparing program for target: {targetname}")
-        # Here you would add the logic to prepare the observing program
-        #pass
-
-
 def current_time():
     """Return the current time in various time zones."""
     now_utc = datetime.now(tz=ZoneInfo("UTC"))
@@ -178,10 +169,12 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--date", type=str, help="set a local date preceeding the night, in YYYY-MM-DD (default: today)", default=None)
     parser.add_argument("-v", "--nightoverview", action="store_true", help="print night overview")
     parser.add_argument("-t", "--targetname", type=str, help="name of target", default=None)
-    parser.add_argument("-f", "--filter", type=str, help="filter", default='R')
-    parser.add_argument("-e", "--exptime", type=int, help="exposure time in seconds", default=60)
-    parser.add_argument("-n", "--nexp", type=int, help="number of exposures", default=5)
-
+    parser.add_argument("--ra", type=str, help="RA of target (optional, in any format that can be parsed as Angle, e.g. '2h43m52s')", default=None)
+    parser.add_argument("--dec", type=str, help="Dec of target (optional, in any format that can be parsed as Angle, e.g. '+25d30m')", default=None)
+    parser.add_argument("-f", "--filter", type=str, help="filter (typically R, V, or B)", default='R')
+    parser.add_argument("-e", "--exptime", type=int, help="exposure time in seconds (default: 60)", default=60)
+    parser.add_argument("-n", "--nexp", type=int, help="number of exposures (default: 5)", default=5)
+    parser.add_argument("-s", "--stare", action="store_true", help="'stare', i.e., do NOT dither the target")
     parser.add_argument("-p", "--prog", action="store_true", help="create program")
     parser.add_argument("-o", "--outputfile", type=str, help="output file for program", default=None)
     args = parser.parse_args()
@@ -205,9 +198,7 @@ if __name__ == "__main__":
             logger.error("Please provide at least a target name.")
         else:
             ap = AstroPlanWrapper()
-            ap.prepare_program(args.targetname, filter=args.filter, exptime=args.exptime, nexp=args.nexp, outputfile=args.outputfile)
-
-
+            ap.prepare_program(args.targetname, ra=args.ra, dec=args.dec, filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
 
     #current_time()
    
