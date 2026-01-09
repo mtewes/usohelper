@@ -18,9 +18,10 @@ from datetime import datetime, timedelta
 import astropy
 import astropy.time
 import astropy.units as u
-from astropy.coordinates import EarthLocation
+from astropy.coordinates import EarthLocation, SkyCoord
 from pytz import timezone
-from astroplan import Observer
+from astroplan import Observer, FixedTarget
+
 
 # Set up logging, adjust format
 #logging_format = "%(levelname)s - %(message)s"
@@ -87,7 +88,29 @@ class AstroPlanWrapper():
         logger.info(f"{'Nautical End':<16}: {format_with_tz(nautend, tzchile)} = {format_with_tz(nautend, tzbonn)} = {format_with_tz(nautend, tzvancouver)}")
         logger.info(f"{'Sunrise':<16}: {format_with_tz(sunrise, tzchile)} = {format_with_tz(sunrise, tzbonn)} = {format_with_tz(sunrise, tzvancouver)}")
 
+
+    def prepare_program(self, targetname, targetra=None, targetdec=None):
+        """
+        Docstring for prepare_program
         
+        :param targetname: name of the target
+        :param targetra: optional RA of target in '20h41m25.9s'
+        :param targetdec: optional Dec of target in '+45d16m49.3s'
+        """
+
+        if targetra is not None and targetdec is not None:
+            coordinates = SkyCoord(targetra, targetdec, frame='icrs')
+            target = FixedTarget(name=targetname, coord=coordinates)
+        else: # We use Simbad to resolve the name
+            target = FixedTarget.from_name(targetname)
+
+        logger.info(f"Preparing observing program for target: {targetname}")
+        logger.info(f"{str(target)}")
+
+        # Placeholder implementation
+        #logger.info(f"Preparing program for target: {targetname}")
+        # Here you would add the logic to prepare the observing program
+        #pass
 
 
 def current_time():
@@ -107,29 +130,15 @@ def current_time():
     return output
 
 
-def compute_night(date):
-    """Compute nautical and astro night times for a given date."""
-    dt = datetime(date.year, date.month, date.day, 12, 0, 0, tzinfo=tzchile)
-
-    # Nautical twilight
-    nautical_start = dt - timedelta(hours=6, minutes=30)
-    nautical_end = dt + timedelta(hours=6, minutes=30)
-
-    # Astronomical twilight
-    astro_start = dt - timedelta(hours=7, minutes=30)
-    astro_end = dt + timedelta(hours=7, minutes=30)
-
-    return {
-        "nautical": (nautical_start, nautical_end),
-        "astronomical": (astro_start, astro_end),
-    }
 
 if __name__ == "__main__":
     
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Utilities for Thunderbrid South")
     parser.add_argument("-d", "--date", type=str, help="set a local date preceeding the night, in YYYY-MM-DD (default: today)", default=None)
-    parser.add_argument("-n", "--n", action="store_true", help="print night overview")
+    parser.add_argument("-n", "--nightoverview", action="store_true", help="print night overview")
+    parser.add_argument("-t", "--targetname", type=str, help="name of target", default=None)
+    parser.add_argument("-p", "--prog", action="store_true", help="print program")
     args = parser.parse_args()
 
     # Defining a local noon time at the observatory for the given date.
@@ -141,9 +150,18 @@ if __name__ == "__main__":
     
     
 
-    if args.n:
+    if args.nightoverview:
         ap = AstroPlanWrapper()
         ap.night_overview(localnoon)
+
+
+    if args.prog:
+        if args.targetname is None:
+            logger.error("Please provide at least a target name.")
+        else:
+            ap = AstroPlanWrapper()
+            ap.prepare_program(args.targetname)
+
 
 
     #current_time()
