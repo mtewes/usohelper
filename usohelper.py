@@ -14,6 +14,8 @@ import logging
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 
+import numpy as np
+
 
 import astropy
 import astropy.time
@@ -48,7 +50,7 @@ class AstroPlanWrapper():
         longitude = -70.8531 * u.deg
         latitude = -30.5261 * u.deg
         elevation = 1710 * u.m
-        location = EarthLocation.from_geodetic(longitude, latitude, elevation)  
+        location = EarthLocation.from_geodetic(longitude, latitude, elevation)
 
         self.observer = Observer(name='Thunderbird South',
                                  location=location,
@@ -57,6 +59,8 @@ class AstroPlanWrapper():
                                  temperature=10 * u.deg_C,
                                  timezone=timezone('America/Santiago'),
                                  description="Thunderbird South")
+
+        self.rng = np.random.default_rng()
 
 
     def night_overview(self, dt):
@@ -89,14 +93,22 @@ class AstroPlanWrapper():
         logger.info(f"{'Sunrise':<16}: {format_with_tz(sunrise, tzchile)} = {format_with_tz(sunrise, tzbonn)} = {format_with_tz(sunrise, tzvancouver)}")
 
 
-    def prepare_program(self, targetname, targetra=None, targetdec=None):
+    def prepare_program(self, targetname, targetra=None, targetdec=None, filter='R', exptime=60, nexp=5, dither=True, outputfile=None):
         """
-        Docstring for prepare_program
+        Prepares a "program" file with dithered exposures of the given target.
         
         :param targetname: name of the target
         :param targetra: optional RA of target in '20h41m25.9s'
         :param targetdec: optional Dec of target in '+45d16m49.3s'
+
+        Reference output format:
+        target: IC1613, ra: 01 04 48.00, dec: 02 07 04.0, filter: R, exposure time: 60, exposure type: light, rotator: absolute, image prefix: IC1613_R, focuser: 21200, nexposure: 1
+
+
+
         """
+
+        dither_radius = 30 * u.arcsec
 
         if targetra is not None and targetdec is not None:
             coordinates = SkyCoord(targetra, targetdec, frame='icrs')
@@ -104,8 +116,36 @@ class AstroPlanWrapper():
         else: # We use Simbad to resolve the name
             target = FixedTarget.from_name(targetname)
 
-        logger.info(f"Preparing observing program for target: {targetname}")
-        logger.info(f"{str(target)}")
+        logger.info(f"Preparing program for target '{targetname}'")
+        #logger.info(f"{str(target)}")
+
+        targetname_safe = targetname.replace(" ", "_")
+
+        output_lines = []
+        output_lines.append(f"# {nexp} exposures of '{targetname}' in filter {filter} with {exptime} s each")
+        for i in range(nexp):
+            
+            if dither:
+                offset_along_ra = self.rng.uniform(low=-1.0, high=1.0) * dither_radius
+                offset_along_dec = self.rng.uniform(low=-1.0, high=1.0) * dither_radius
+                this_exp_coord = target.coord.spherical_offsets_by(offset_along_ra, offset_along_dec)
+            else:
+                this_exp_coord = target.coord
+
+            line = f"target: {targetname_safe}, ra: {this_exp_coord.ra.to_string(unit=u.hour, sep=' ', pad=True, precision=2)}, dec: {this_exp_coord.dec.to_string(unit=u.degree, sep=' ', pad=True, precision=2, alwayssign=True)}, filter: {filter}, exposure time: {exptime}, exposure type: light, rotator: absolute, image prefix: {targetname_safe}_{filter}, focuser: 21200, nexposure: 1"
+
+            output_lines.append(line)
+        
+        if outputfile is not None:
+            with open(outputfile, 'w') as f:
+                for line in output_lines:
+                    f.write(line + "\n")
+            logger.info(f"Wrote program to file: {outputfile}")
+        else:
+            print("\n".join(output_lines))
+
+
+
 
         # Placeholder implementation
         #logger.info(f"Preparing program for target: {targetname}")
@@ -136,9 +176,14 @@ if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Utilities for Thunderbrid South")
     parser.add_argument("-d", "--date", type=str, help="set a local date preceeding the night, in YYYY-MM-DD (default: today)", default=None)
-    parser.add_argument("-n", "--nightoverview", action="store_true", help="print night overview")
+    parser.add_argument("-v", "--nightoverview", action="store_true", help="print night overview")
     parser.add_argument("-t", "--targetname", type=str, help="name of target", default=None)
-    parser.add_argument("-p", "--prog", action="store_true", help="print program")
+    parser.add_argument("-f", "--filter", type=str, help="filter", default='R')
+    parser.add_argument("-e", "--exptime", type=int, help="exposure time in seconds", default=60)
+    parser.add_argument("-n", "--nexp", type=int, help="number of exposures", default=5)
+
+    parser.add_argument("-p", "--prog", action="store_true", help="create program")
+    parser.add_argument("-o", "--outputfile", type=str, help="output file for program", default=None)
     args = parser.parse_args()
 
     # Defining a local noon time at the observatory for the given date.
@@ -160,7 +205,7 @@ if __name__ == "__main__":
             logger.error("Please provide at least a target name.")
         else:
             ap = AstroPlanWrapper()
-            ap.prepare_program(args.targetname)
+            ap.prepare_program(args.targetname, filter=args.filter, exptime=args.exptime, nexp=args.nexp, outputfile=args.outputfile)
 
 
 
