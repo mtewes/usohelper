@@ -35,13 +35,27 @@ logger = logging.getLogger(__name__)
 tzchile = ZoneInfo("America/Santiago")
 tzvancouver = ZoneInfo("America/Vancouver")
 tzbonn = ZoneInfo("Europe/Berlin")
-#tzutc = ZoneInfo("UTC")
+tzutc = ZoneInfo("UTC")
 
 
-def format_dt(dt):
+def format_dt(dt, long=True):
     """Format datetime object for display."""
-    return dt.strftime("%a %Y-%m-%d %H:%M")
+    if long:
+        return dt.strftime("%a %Y-%m-%d %H:%M")
+    else:
+        return dt.strftime("%a %d %H:%M")
 
+
+def format_dt_with_tz(dt, tz, **kwargs):
+    dt_with_tz = dt.astimezone(tz)
+    tz_name = str(dt_with_tz.tzinfo)
+    my_tz_names = {
+        'America/Santiago': 'Chile',
+        'America/Vancouver': 'Vancouver',
+        'Europe/Berlin': 'Bonn',
+        'UTC': 'UTC',
+    }
+    return format_dt(dt_with_tz, **kwargs) + f" [{my_tz_names.get(tz_name, tz_name)}]"
 
 class AstroPlanWrapper():
     def __init__(self):
@@ -60,7 +74,7 @@ class AstroPlanWrapper():
                                  timezone=timezone('America/Santiago'),
                                  description="Thunderbird South")
 
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(seed=42)
 
 
     def night_overview(self, dt):
@@ -69,14 +83,13 @@ class AstroPlanWrapper():
         dt is a datetime object.
         """
 
-        def format_with_tz(time, tz):
+        def format(time, tz, **kwargs):
             dt = self.observer.astropy_time_to_datetime(time)
-            dt = dt.astimezone(tz)
-            return dt.strftime("%a %Y-%m-%d %H:%M") + f" [{str(dt.tzinfo).split('/')[-1]}]"
+            return format_dt_with_tz(dt, tz, **kwargs)
+            
         
-
         time = self.observer.datetime_to_astropy_time(dt)
-        logger.info(f"=== Night of {format_with_tz(time, tzchile)} ===")
+        logger.info(f"=== Night of {format(time, tzchile)} ===")
         
         sunset = self.observer.sun_set_time(time, which='next')
         nautstart = self.observer.twilight_evening_nautical(time, which='next')
@@ -85,12 +98,12 @@ class AstroPlanWrapper():
         nautend = self.observer.twilight_morning_nautical(time, which='next')
         sunrise = self.observer.sun_rise_time(time, which='next')
 
-        logger.info(f"{'Sunset':<16}: {format_with_tz(sunset, tzchile)} = {format_with_tz(sunset, tzbonn)} = {format_with_tz(sunset, tzvancouver)}")
-        logger.info(f"{'Nautical Start':<16}: {format_with_tz(nautstart, tzchile)} = {format_with_tz(nautstart, tzbonn)} = {format_with_tz(nautstart, tzvancouver)}")
-        logger.info(f"{'Astron. Start':<16}: {format_with_tz(astrstart, tzchile)} = {format_with_tz(astrstart, tzbonn)} = {format_with_tz(astrstart, tzvancouver)}")
-        logger.info(f"{'Astron. End':<16}: {format_with_tz(astrend, tzchile)} = {format_with_tz(astrend, tzbonn)} = {format_with_tz(astrend, tzvancouver)}")
-        logger.info(f"{'Nautical End':<16}: {format_with_tz(nautend, tzchile)} = {format_with_tz(nautend, tzbonn)} = {format_with_tz(nautend, tzvancouver)}")
-        logger.info(f"{'Sunrise':<16}: {format_with_tz(sunrise, tzchile)} = {format_with_tz(sunrise, tzbonn)} = {format_with_tz(sunrise, tzvancouver)}")
+        logger.info(f"{'Sunset':<16}: {format(sunset, tzchile, long=False)} = {format(sunset, tzbonn, long=False)} = {format(sunset, tzvancouver, long=False)} = {format(sunset, tzutc, long=False)}")
+        logger.info(f"{'Nautical Start':<16}: {format(nautstart, tzchile, long=False)} = {format(nautstart, tzbonn, long=False)} = {format(nautstart, tzvancouver, long=False)} = {format(nautstart, tzutc, long=False)}")
+        logger.info(f"{'Astron. Start':<16}: {format(astrstart, tzchile, long=False)} = {format(astrstart, tzbonn, long=False)} = {format(astrstart, tzvancouver, long=False)} = {format(astrstart, tzutc, long=False)}")
+        logger.info(f"{'Astron. End':<16}: {format(astrend, tzchile, long=False)} = {format(astrend, tzbonn, long=False)} = {format(astrend, tzvancouver, long=False)} = {format(astrend, tzutc, long=False)}")
+        logger.info(f"{'Nautical End':<16}: {format(nautend, tzchile, long=False)} = {format(nautend, tzbonn, long=False)} = {format(nautend, tzvancouver, long=False)} = {format(nautend, tzutc, long=False)}")
+        logger.info(f"{'Sunrise':<16}: {format(sunrise, tzchile, long=False)} = {format(sunrise, tzbonn, long=False)} = {format(sunrise, tzvancouver, long=False)} = {format(sunrise, tzutc, long=False)}")
 
 
     def prepare_program(self, targetname, ra=None, dec=None, filter='R', exptime=60, nexp=5, stare=False, outputfile=None):
@@ -146,19 +159,20 @@ class AstroPlanWrapper():
 
 def current_time():
     """Return the current time in various time zones."""
-    now_utc = datetime.now(tz=ZoneInfo("UTC"))
-    output = {
-        "UTC": now_utc,
-        "Chile": now_utc.astimezone(tzchile),
-        "Vancouver": now_utc.astimezone(tzvancouver),
-        "Bonn": now_utc.astimezone(tzbonn),
-    }
-    
+    now = datetime.now(tz=tzutc)
     logger.info("=== Current time ===")
-    for zone, dt in output.items():
-        logger.info(f"{zone:<12}: {format_dt(dt)} [{dt.tzinfo}]")
+    logger.info(f"{format_dt_with_tz(now, tzchile, long=False)} = {format_dt_with_tz(now, tzbonn, long=False)} = {format_dt_with_tz(now, tzvancouver, long=False)} = {format_dt_with_tz(now, tzutc, long=False)}\n")
+    #output = {
+    #    "UTC": now_utc,
+    #    "Chile": now_utc.astimezone(tzchile),
+    #    "Vancouver": now_utc.astimezone(tzvancouver),
+    #    "Bonn": now_utc.astimezone(tzbonn),
+    #}
 
-    return output
+    #for zone, dt in output.items():
+    #    logger.info(format_dt_with_tz(dt, dt.tzinfo))
+
+    #return output
 
 
 
@@ -186,7 +200,8 @@ if __name__ == "__main__":
     localnoon = datetime.strptime(args.date, "%Y-%m-%d")
     localnoon = datetime(localnoon.year, localnoon.month, localnoon.day, 12, 0, 0, tzinfo=tzchile)
     
-    
+    # We allways print the current time
+    current_time()
 
     if args.nightoverview:
         ap = AstroPlanWrapper()
@@ -200,6 +215,6 @@ if __name__ == "__main__":
             ap = AstroPlanWrapper()
             ap.prepare_program(args.targetname, ra=args.ra, dec=args.dec, filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
 
-    #current_time()
+    
    
 
