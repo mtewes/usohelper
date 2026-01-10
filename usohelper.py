@@ -37,6 +37,13 @@ tzvancouver = ZoneInfo("America/Vancouver")
 tzbonn = ZoneInfo("Europe/Berlin")
 tzutc = ZoneInfo("UTC")
 
+custom_tz_names = {
+        'America/Santiago': 'Chile',
+        'America/Vancouver': 'Vancouver',
+        'Europe/Berlin': 'Bonn',
+        'UTC': 'UTC',
+    }
+
 
 def format_dt(dt, long=True):
     """Format datetime object for display."""
@@ -49,13 +56,7 @@ def format_dt(dt, long=True):
 def format_dt_with_tz(dt, tz, **kwargs):
     dt_with_tz = dt.astimezone(tz)
     tz_name = str(dt_with_tz.tzinfo)
-    my_tz_names = {
-        'America/Santiago': 'Chile',
-        'America/Vancouver': 'Vancouver',
-        'Europe/Berlin': 'Bonn',
-        'UTC': 'UTC',
-    }
-    return format_dt(dt_with_tz, **kwargs) + f" [{my_tz_names.get(tz_name, tz_name)}]"
+    return format_dt(dt_with_tz, **kwargs) + f" [{custom_tz_names.get(tz_name, tz_name)}]"
 
 class AstroPlanWrapper():
     def __init__(self):
@@ -162,17 +163,7 @@ def current_time():
     now = datetime.now(tz=tzutc)
     logger.info("=== Current time ===")
     logger.info(f"{format_dt_with_tz(now, tzchile, long=False)} = {format_dt_with_tz(now, tzbonn, long=False)} = {format_dt_with_tz(now, tzvancouver, long=False)} = {format_dt_with_tz(now, tzutc, long=False)}\n")
-    #output = {
-    #    "UTC": now_utc,
-    #    "Chile": now_utc.astimezone(tzchile),
-    #    "Vancouver": now_utc.astimezone(tzvancouver),
-    #    "Bonn": now_utc.astimezone(tzbonn),
-    #}
-
-    #for zone, dt in output.items():
-    #    logger.info(format_dt_with_tz(dt, dt.tzinfo))
-
-    #return output
+    
 
 
 
