@@ -12,11 +12,12 @@ import argparse
 import logging
 
 from zoneinfo import ZoneInfo
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 import astropy
 import astropy.time
@@ -24,7 +25,7 @@ import astropy.units as u
 from astropy.coordinates import EarthLocation, SkyCoord, Angle
 from pytz import timezone
 from astroplan import Observer, FixedTarget
-from astroplan.plots import plot_airmass
+from astroplan.plots import plot_airmass, plot_altitude
 
 
 # Set up logging, adjust format
@@ -183,16 +184,19 @@ class AstroPlanWrapper():
         time = self.observer.datetime_to_astropy_time(dt)
 
         moon_coords = astropy.coordinates.get_body("Moon", time, location=self.observer.location)
-        moon_target = FixedTarget(name='Moon', coord=moon_coords)
+        moon_coords = SkyCoord(moon_coords.ra, moon_coords.dec)
+        moon_target = FixedTarget(name=f"Moon (illum. {self.observer.moon_illumination(time)*100.0:.0f}%)", coord=moon_coords)
         moon_style = {'color': 'gray', 'fmt': '--'}
 
-        plt.figure(figsize=(10, 6))
-        plot_airmass(self.target, self.observer, time, brightness_shading=True)
+        dtFmt = mdates.DateFormatter('%m-%d %H:%M') # define the formatting
 
-        plot_airmass(moon_target, self.observer, time, style_kwargs=moon_style)
+        fig, ax = plt.subplots(figsize=(5, 5), layout="constrained")
+        plot_altitude(self.target, self.observer, time, brightness_shading=True, style_kwargs={'color': 'blue', 'fmt': '-'})
+        plot_altitude(moon_target, self.observer, time, style_kwargs=moon_style)
+        plt.gca().xaxis.set_major_formatter(dtFmt) # apply the format to the desired axis
+
         #plt.title(f"Observability of {self.target.name}")
         plt.legend()
-        plt.tight_layout
         plt.show()
 
 
