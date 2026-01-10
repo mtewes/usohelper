@@ -182,8 +182,16 @@ class AstroPlanWrapper():
         """
         time = self.observer.datetime_to_astropy_time(dt)
 
+        moon_coords = astropy.coordinates.get_body("Moon", time, location=self.observer.location)
+        moon_target = FixedTarget(name='Moon', coord=moon_coords)
+        moon_style = {'color': 'gray', 'fmt': '--'}
+
+        plt.figure(figsize=(10, 6))
         plot_airmass(self.target, self.observer, time, brightness_shading=True)
-        plt.title(f"Observability of {self.target.name}")
+
+        plot_airmass(moon_target, self.observer, time, style_kwargs=moon_style)
+        #plt.title(f"Observability of {self.target.name}")
+        plt.legend()
         plt.tight_layout
         plt.show()
 
