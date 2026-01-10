@@ -109,13 +109,28 @@ class AstroPlanWrapper():
         logger.info(f"{'Sunrise':<16}: {format(sunrise, tzchile, long=False)} = {format(sunrise, tzbonn, long=False)} = {format(sunrise, tzvancouver, long=False)} = {format(sunrise, tzutc, long=False)}")
 
 
-    def set_target(self, targetname, ra=None, dec=None):
+    def set_target(self, targetname, ra=None, dec=None, coords=None):
 
-        if ra is not None and dec is not None:
+        if targetname is None:
+            logger.error("Always provide at least a target name!")
+
+        if ra is None and dec is None and coords is None:
+            # Then we resolve the name via Simbad
+            self.target = FixedTarget.from_name(targetname)
+
+        elif coords is not None:
+            # We parse the given coord string
+            #ra_str, dec_str = coord.split()
+            #coordinates = SkyCoord(Angle(ra_str), Angle(dec_str), frame='icrs')
+            coordinates = SkyCoord(coords, frame='icrs')
+            self.target = FixedTarget(name=targetname, coord=coordinates)
+
+        elif ra is not None and dec is not None:
             coordinates = SkyCoord(Angle(ra), Angle(dec), frame='icrs')
             self.target = FixedTarget(name=targetname, coord=coordinates)
-        else: # We use Simbad to resolve the name
-            self.target = FixedTarget.from_name(targetname)
+        
+        else:
+            logger.error("Either provide coords, or both ra and dec, or provide neither to resolve the name via Simbad!")
 
         self.targetname_safe = targetname.replace(" ", "_")
         
@@ -168,6 +183,8 @@ class AstroPlanWrapper():
         time = self.observer.datetime_to_astropy_time(dt)
 
         plot_airmass(self.target, self.observer, time, brightness_shading=True)
+        plt.title(f"Observability of {self.target.name}")
+        plt.tight_layout
         plt.show()
 
 
@@ -189,6 +206,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--targetname", type=str, help="name of target", default=None)
     parser.add_argument("--ra", type=str, help="RA of target (optional, in any format that can be parsed as Angle, e.g. '2h43m52s')", default=None)
     parser.add_argument("--dec", type=str, help="Dec of target (optional, in any format that can be parsed as Angle, e.g. '+25d30m')", default=None)
+    parser.add_argument("--coords", type=str, help="Coordinates of target, in format 'RA DEC' (e.g. '2h43m52s +25d30m')", default=None)
     parser.add_argument("-f", "--filter", type=str, help="filter (typically R, V, or B)", default='R')
     parser.add_argument("-e", "--exptime", type=int, help="exposure time in seconds (default: 60)", default=60)
     parser.add_argument("-n", "--nexp", type=int, help="number of exposures (default: 5)", default=5)
@@ -204,6 +222,7 @@ if __name__ == "__main__":
         args.date = datetime.now(tz=tzchile).strftime("%Y-%m-%d")
     localnoon = datetime.strptime(args.date, "%Y-%m-%d")
     localnoon = datetime(localnoon.year, localnoon.month, localnoon.day, 12, 0, 0, tzinfo=tzchile)
+    localmidnight = datetime(localnoon.year, localnoon.month, localnoon.day, 23, 59, 59, tzinfo=tzchile)
     
     # We allways print the current time
     current_time()
@@ -212,21 +231,15 @@ if __name__ == "__main__":
         ap = AstroPlanWrapper()
         ap.night_overview(localnoon)
 
+    if args.prog:
+        ap = AstroPlanWrapper()
+        ap.set_target(args.targetname, ra=args.ra, dec=args.dec, coords=args.coords)
+        ap.prepare_program(filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
 
     if args.plotairmass:
         ap = AstroPlanWrapper()
-        ap.set_target(args.targetname, ra=args.ra, dec=args.dec)
-        ap.plot_observability_chart(localnoon)
-
-
-    if args.prog:
-        if args.targetname is None:
-            logger.error("Please provide at least a target name.")
-        else:
-            ap = AstroPlanWrapper()
-            ap.set_target(args.targetname, ra=args.ra, dec=args.dec)
-            ap.prepare_program(filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
-
+        ap.set_target(args.targetname, ra=args.ra, dec=args.dec, coords=args.coords)
+        ap.plot_observability_chart(localmidnight)
     
    
 
