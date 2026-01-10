@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
+import matplotlib.pyplot as plt
 
 import astropy
 import astropy.time
@@ -23,6 +24,7 @@ import astropy.units as u
 from astropy.coordinates import EarthLocation, SkyCoord, Angle
 from pytz import timezone
 from astroplan import Observer, FixedTarget
+from astroplan.plots import plot_airmass
 
 
 # Set up logging, adjust format
@@ -107,7 +109,19 @@ class AstroPlanWrapper():
         logger.info(f"{'Sunrise':<16}: {format(sunrise, tzchile, long=False)} = {format(sunrise, tzbonn, long=False)} = {format(sunrise, tzvancouver, long=False)} = {format(sunrise, tzutc, long=False)}")
 
 
-    def prepare_program(self, targetname, ra=None, dec=None, filter='R', exptime=60, nexp=5, stare=False, outputfile=None):
+    def set_target(self, targetname, ra=None, dec=None):
+
+        if ra is not None and dec is not None:
+            coordinates = SkyCoord(Angle(ra), Angle(dec), frame='icrs')
+            self.target = FixedTarget(name=targetname, coord=coordinates)
+        else: # We use Simbad to resolve the name
+            self.target = FixedTarget.from_name(targetname)
+
+        self.targetname_safe = targetname.replace(" ", "_")
+        
+        
+
+    def prepare_program(self, filter='R', exptime=60, nexp=5, stare=False, outputfile=None):
         """
         Prepares a "program" file with dithered exposures of the given target.
         
@@ -122,29 +136,20 @@ class AstroPlanWrapper():
         dither = not stare
         dither_radius = 15 * u.arcsec
 
-        if ra is not None and dec is not None:
-            coordinates = SkyCoord(Angle(ra), Angle(dec), frame='icrs')
-            target = FixedTarget(name=targetname, coord=coordinates)
-        else: # We use Simbad to resolve the name
-            target = FixedTarget.from_name(targetname)
-
-        logger.info(f"Preparing program for target '{targetname}'")
-        #logger.info(f"{str(target)}")
-
-        targetname_safe = targetname.replace(" ", "_")
-
+        logger.info(f"Preparing program for target '{self.target.name}'")
+        
         output_lines = []
-        output_lines.append(f"# {nexp} exposures of '{targetname}' in filter {filter} with {exptime} s each")
+        output_lines.append(f"# {nexp} exposures of '{self.target.name}' in filter {filter} with {exptime} s each")
         for i in range(nexp):
             
             if dither:
                 offset_along_ra = self.rng.uniform(low=-1.0, high=1.0) * dither_radius
                 offset_along_dec = self.rng.uniform(low=-1.0, high=1.0) * dither_radius
-                this_exp_coord = target.coord.spherical_offsets_by(offset_along_ra, offset_along_dec)
+                this_exp_coord = self.target.coord.spherical_offsets_by(offset_along_ra, offset_along_dec)
             else:
-                this_exp_coord = target.coord
+                this_exp_coord = self.target.coord
 
-            line = f"target: {targetname_safe}, ra: {this_exp_coord.ra.to_string(unit=u.hour, sep=' ', pad=True, precision=2)}, dec: {this_exp_coord.dec.to_string(unit=u.degree, sep=' ', pad=True, precision=2, alwayssign=True)}, filter: {filter}, exposure time: {exptime}, exposure type: light, rotator: absolute, image prefix: {targetname_safe}_{filter}, focuser: 21200, nexposure: 1"
+            line = f"target: {self.targetname_safe}, ra: {this_exp_coord.ra.to_string(unit=u.hour, sep=' ', pad=True, precision=2)}, dec: {this_exp_coord.dec.to_string(unit=u.degree, sep=' ', pad=True, precision=2, alwayssign=True)}, filter: {filter}, exposure time: {exptime}, exposure type: light, rotator: absolute, image prefix: {self.targetname_safe}_{filter}, focuser: 21200, nexposure: 1"
 
             output_lines.append(line)
         
@@ -156,6 +161,14 @@ class AstroPlanWrapper():
         else:
             print("\n".join(output_lines))
 
+
+    def plot_observability_chart(self, dt):
+        """
+        """
+        time = self.observer.datetime_to_astropy_time(dt)
+
+        plot_airmass(self.target, self.observer, time, brightness_shading=True)
+        plt.show()
 
 
 def current_time():
@@ -182,6 +195,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--stare", action="store_true", help="'stare', i.e., do NOT dither the target")
     parser.add_argument("-p", "--prog", action="store_true", help="create program")
     parser.add_argument("-o", "--outputfile", type=str, help="output file for program", default=None)
+    parser.add_argument("-a", "--plotairmass", action="store_true", help="show observability chart for target")
     args = parser.parse_args()
 
     # Defining a local noon time at the observatory for the given date.
@@ -199,12 +213,19 @@ if __name__ == "__main__":
         ap.night_overview(localnoon)
 
 
+    if args.plotairmass:
+        ap = AstroPlanWrapper()
+        ap.set_target(args.targetname, ra=args.ra, dec=args.dec)
+        ap.plot_observability_chart(localnoon)
+
+
     if args.prog:
         if args.targetname is None:
             logger.error("Please provide at least a target name.")
         else:
             ap = AstroPlanWrapper()
-            ap.prepare_program(args.targetname, ra=args.ra, dec=args.dec, filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
+            ap.set_target(args.targetname, ra=args.ra, dec=args.dec)
+            ap.prepare_program(filter=args.filter, exptime=args.exptime, nexp=args.nexp, stare=args.stare, outputfile=args.outputfile)
 
     
    
