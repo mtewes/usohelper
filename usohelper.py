@@ -96,17 +96,19 @@ class AstroPlanWrapper():
         logger.info(f"=== Night of {format(time, tzchile)} ===")
         
         sunset = self.observer.sun_set_time(time, which='next')
+        civilstart = self.observer.twilight_evening_civil(time, which='next')
         nautstart = self.observer.twilight_evening_nautical(time, which='next')
         astrstart = self.observer.twilight_evening_astronomical(time, which='next')
         astrend = self.observer.twilight_morning_astronomical(time, which='next')
         nautend = self.observer.twilight_morning_nautical(time, which='next')
+        civilend = self.observer.twilight_morning_civil(time, which='next')
         sunrise = self.observer.sun_rise_time(time, which='next')
 
         logger.info(f"{'Sunset':<16}: {format(sunset, tzchile, long=False)} = {format(sunset, tzbonn, long=False)} = {format(sunset, tzvancouver, long=False)} = {format(sunset, tzutc, long=False)}")
-        logger.info(f"{'Nautical Start':<16}: {format(nautstart, tzchile, long=False)} = {format(nautstart, tzbonn, long=False)} = {format(nautstart, tzvancouver, long=False)} = {format(nautstart, tzutc, long=False)}")
+        logger.info(f"{'Civil Start':<16}: {format(civilstart, tzchile, long=False)} = {format(civilstart, tzbonn, long=False)} = {format(civilstart, tzvancouver, long=False)} = {format(civilstart, tzutc, long=False)}")
         logger.info(f"{'Astron. Start':<16}: {format(astrstart, tzchile, long=False)} = {format(astrstart, tzbonn, long=False)} = {format(astrstart, tzvancouver, long=False)} = {format(astrstart, tzutc, long=False)}")
         logger.info(f"{'Astron. End':<16}: {format(astrend, tzchile, long=False)} = {format(astrend, tzbonn, long=False)} = {format(astrend, tzvancouver, long=False)} = {format(astrend, tzutc, long=False)}")
-        logger.info(f"{'Nautical End':<16}: {format(nautend, tzchile, long=False)} = {format(nautend, tzbonn, long=False)} = {format(nautend, tzvancouver, long=False)} = {format(nautend, tzutc, long=False)}")
+        logger.info(f"{'Civil End':<16}: {format(civilend, tzchile, long=False)} = {format(civilend, tzbonn, long=False)} = {format(civilend, tzvancouver, long=False)} = {format(civilend, tzutc, long=False)}")
         logger.info(f"{'Sunrise':<16}: {format(sunrise, tzchile, long=False)} = {format(sunrise, tzbonn, long=False)} = {format(sunrise, tzvancouver, long=False)} = {format(sunrise, tzutc, long=False)}")
 
 
@@ -197,6 +199,7 @@ class AstroPlanWrapper():
 
         #plt.title(f"Observability of {self.target.name}")
         plt.legend()
+        plt.grid()
         plt.show()
 
 
